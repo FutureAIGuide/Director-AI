@@ -1,31 +1,11 @@
 #!/usr/bin/env python3
 """
-📸 URL Screenshot Processor
-
-A powerful Python tool that automatically captures screenshots and extracts logo URLs 
-from websites listed in spreadsheets. Perfect for web research, competitive analysis, 
-and building visual databases of websites.
-
-FEATURES:
-- 🌐 Batch Processing: Process multiple URLs simultaneously with configurable concurrency
-- 📸 Full-Page Screenshots: Capture complete webpage screenshots in PNG format
-- 🎯 Logo Detection: Automatically extract company logos and favicons
-- 📊 Multiple Formats: Support for CSV and Excel files
-- 🔄 Retry Logic: Automatic retry for failed requests with exponential backoff
-- 🌐 Multi-Browser: Firefox, WebKit, and Chromium browser support with automatic fallback
-- 📈 Progress Tracking: Real-time progress reporting and comprehensive statistics
-- 🛡️ Error Handling: Graceful handling of invalid URLs and network issues
-- 🎨 Detailed Logging: Comprehensive logging with configurable verbosity levels
-
-QUICK START:
-1. Run setup: ./setup_and_run.sh
-2. Activate environment: source venv/bin/activate
-3. Create sample: python url_screenshot_processor.py --create-sample
-4. Process URLs: python url_screenshot_processor.py sample_urls.xlsx
-
-For detailed documentation, see URL_Screenshot_Processor_README.md
+This script has been archived as a backup.
+All main logic and new features are now in director_ai.py.
 """
 
+from dataclasses import dataclass
+import argparse
 import pandas as pd
 import asyncio
 import os
@@ -38,8 +18,11 @@ import json
 import time
 import re
 from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass
-import argparse
+try:
+    from PIL import Image, ImageDraw
+except ImportError:
+    Image = None
+    ImageDraw = None
 
 # Configure logging
 logging.basicConfig(
@@ -102,6 +85,47 @@ class URLValidator:
             return None
 
 class URLProcessor:
+    async def take_element_screenshot(self, page, selector: str, filename: str) -> Optional[str]:
+        """Take a screenshot of a specific element on the page"""
+        try:
+            element = await page.query_selector(selector)
+            if element:
+                screenshot_path = self.output_dir / filename
+                await element.screenshot(path=str(screenshot_path))
+                return str(screenshot_path)
+            else:
+                logger.warning(f"Element not found for selector: {selector}")
+                return None
+        except Exception as e:
+            logger.error(f"Error taking element screenshot: {e}")
+            return None
+
+    async def annotate_screenshot(self, image_path: str, annotations: Dict) -> Optional[str]:
+        """Annotate screenshot with highlights or notes (simple rectangle highlight)"""
+        try:
+            from PIL import Image, ImageDraw
+            img = Image.open(image_path)
+            draw = ImageDraw.Draw(img)
+            # Example: annotations = { 'rectangles': [ (x1, y1, x2, y2), ... ] }
+            for rect in annotations.get('rectangles', []):
+                draw.rectangle(rect, outline='red', width=3)
+            annotated_path = image_path.replace('.png', '_annotated.png')
+            img.save(annotated_path)
+            return annotated_path
+        except Exception as e:
+            logger.error(f"Error annotating screenshot: {e}")
+            return None
+
+    async def extract_metadata(self, page) -> Dict:
+        """Extract metadata from the page (title, meta tags, Open Graph)"""
+        metadata = {}
+        try:
+            metadata['title'] = await page.title()
+            meta_tags = await page.eval_on_selector_all('meta', 'elements => elements.map(e => ({name: e.name || e.getAttribute("property"), content: e.content}))')
+            metadata['meta_tags'] = meta_tags
+        except Exception as e:
+            logger.error(f"Error extracting metadata: {e}")
+        return metadata
     def __init__(self, spreadsheet_path, output_dir="screenshots", config=None):
         self.spreadsheet_path = Path(spreadsheet_path)
         self.output_dir = Path(output_dir)

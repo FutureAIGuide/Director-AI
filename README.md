@@ -1,4 +1,39 @@
 # 📸 URL Screenshot Processor
+A powerful Python tool that automatically captures screenshots and extracts logo URLs from websites listed in spreadsheets. Perfect for web research, competitive analysis, and building visual databases of websites.
+
+# Director-AI Foundation & Environment Setup
+
+## Installation
+
+1. Create and activate a virtual environment:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+2. Upgrade pip:
+   ```bash
+   pip install --upgrade pip
+   ```
+
+3. Install all dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. (Optional) Install Playwright browsers:
+   ```bash
+   playwright install
+   ```
+
+5. Run the main script:
+   ```bash
+   python director_ai.py
+   ```
+
+## 3. Codebase Refactoring
+- Refactor main modules for modularity and extensibility.
+- Prepare for plugin-ready architecture (see implementation plan).
 
 A powerful Python tool that automatically captures screenshots and extracts logo URLs from websites listed in spreadsheets. Perfect for web research, competitive analysis, and building visual databases of websites.
 
