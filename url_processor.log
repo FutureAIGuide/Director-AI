@@ -1,0 +1,30 @@
+2025-08-19 15:09:08,890 - INFO - Loaded 1 URLs from /Users/matt/Desktop/URL Screenshot Processor/test_single.csv
+2025-08-19 15:09:08,891 - INFO - Starting processing of 1 URLs...
+2025-08-19 15:09:09,860 - INFO - [0/1] Processing batch 1/1
+2025-08-19 15:09:09,867 - ERROR - Browser error: No browser available. Please run 'playwright install' to install browsers.
+2025-08-19 15:09:09,872 - INFO - Results saved to /Users/matt/Desktop/URL Screenshot Processor/test_single_processed.csv
+2025-08-19 15:09:09,872 - INFO - Processing complete! 0/1 URLs processed successfully
+2025-08-19 15:09:09,872 - INFO - Results saved to: /Users/matt/Desktop/URL Screenshot Processor/test_single_processed.csv
+2025-08-19 15:09:09,872 - INFO - Summary: 0.0% success rate, 0.0% logo detection rate
+2025-08-19 15:09:09,872 - INFO - Processing time: 0.98 seconds
+2025-08-19 15:09:37,382 - INFO - Created sample_urls.xlsx with test URLs
+2025-08-19 15:11:03,320 - INFO - Loaded 1 URLs from /Users/matt/Desktop/URL Screenshot Processor/test.csv
+2025-08-19 15:11:03,320 - INFO - Starting processing of 1 URLs...
+2025-08-19 15:11:03,589 - INFO - [0/1] Processing batch 1/1
+2025-08-19 15:11:03,595 - ERROR - Browser error: No browser available. Please run 'playwright install' to install browsers.
+2025-08-19 15:11:03,600 - INFO - Results saved to /Users/matt/Desktop/URL Screenshot Processor/test_processed.csv
+2025-08-19 15:11:03,600 - INFO - Processing complete! 0/1 URLs processed successfully
+2025-08-19 15:11:03,600 - INFO - Results saved to: /Users/matt/Desktop/URL Screenshot Processor/test_processed.csv
+2025-08-19 15:11:03,600 - INFO - Summary: 0.0% success rate, 0.0% logo detection rate
+2025-08-19 15:11:03,600 - INFO - Processing time: 0.28 seconds
+2025-08-19 15:11:38,419 - INFO - Loaded 1 URLs from /Users/matt/Desktop/URL Screenshot Processor/test copy.csv
+2025-08-19 15:11:38,419 - INFO - Starting processing of 1 URLs...
+2025-08-19 15:11:38,718 - INFO - [0/1] Processing batch 1/1
+2025-08-19 15:11:38,725 - ERROR - Browser error: No browser available. Please run 'playwright install' to install browsers.
+2025-08-19 15:11:38,729 - INFO - Results saved to /Users/matt/Desktop/URL Screenshot Processor/test copy_processed.csv
+2025-08-19 15:11:38,730 - INFO - Processing complete! 0/1 URLs processed successfully
+2025-08-19 15:11:38,730 - INFO - Results saved to: /Users/matt/Desktop/URL Screenshot Processor/test copy_processed.csv
+2025-08-19 15:11:38,730 - INFO - Summary: 0.0% success rate, 0.0% logo detection rate
+2025-08-19 15:11:38,730 - INFO - Processing time: 0.31 seconds
+2025-08-19 17:51:29,942 - INFO - Created sample_urls.xlsx with test URLs
+2025-08-19 17:51:52,523 - INFO - Created sample_urls.xlsx with test URLs

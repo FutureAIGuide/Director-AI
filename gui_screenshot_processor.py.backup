@@ -1,0 +1,416 @@
+#!/usr/bin/env python3
+"""
+GUI Screenshot Processor - A simple graphical interface for the URL Screenshot Processor
+
+This GUI provides an easy-to-use interface for processing URLs and capturing screenshots
+without needing to use command-line arguments.
+
+Requirements:
+- Python 3.7+
+- tkinter (usually included with Python)
+- All dependencies from url_screenshot_processor.py
+
+Usage:
+    python gui_screenshot_processor.py
+"""
+
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox, scrolledtext
+import threading
+import subprocess
+import sys
+import os
+from pathlib import Path
+import queue
+import time
+
+class ScreenshotProcessorGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("📸 URL Screenshot Processor")
+        self.root.geometry("800x700")
+        self.root.resizable(True, True)
+        
+        # Configure style
+        style = ttk.Style()
+        style.theme_use('clam')
+        
+        # Variables
+        self.input_file = tk.StringVar()
+        self.output_dir = tk.StringVar(value="screenshots")
+        self.batch_size = tk.IntVar(value=3)
+        self.max_retries = tk.IntVar(value=2)
+        self.timeout = tk.IntVar(value=30000)
+        self.verbose = tk.BooleanVar(value=False)
+        
+        # Processing state
+        self.processing = False
+        self.process = None
+        self.output_queue = queue.Queue()
+        
+        self.setup_ui()
+        self.check_dependencies()
+        
+    def setup_ui(self):
+        """Setup the user interface"""
+        # Main frame
+        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Configure grid weights
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+        main_frame.columnconfigure(1, weight=1)
+        
+        # Title
+        title_label = ttk.Label(main_frame, text="📸 URL Screenshot Processor", 
+                               font=('Helvetica', 16, 'bold'))
+        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
+        
+        # File selection section
+        file_frame = ttk.LabelFrame(main_frame, text="Input File", padding="10")
+        file_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
+        file_frame.columnconfigure(1, weight=1)
+        
+        ttk.Label(file_frame, text="CSV/Excel File:").grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
+        ttk.Entry(file_frame, textvariable=self.input_file, width=50).grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
+        ttk.Button(file_frame, text="Browse", command=self.browse_file).grid(row=0, column=2)
+        
+        # Quick actions
+        quick_frame = ttk.Frame(file_frame)
+        quick_frame.grid(row=1, column=0, columnspan=3, pady=(10, 0))
+        
+        ttk.Button(quick_frame, text="Create Sample File", 
+                  command=self.create_sample).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(quick_frame, text="Open Results Folder", 
+                  command=self.open_results).pack(side=tk.LEFT)
+        
+        # Settings section
+        settings_frame = ttk.LabelFrame(main_frame, text="Settings", padding="10")
+        settings_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
+        settings_frame.columnconfigure(1, weight=1)
+        
+        # Output directory
+        ttk.Label(settings_frame, text="Output Directory:").grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
+        ttk.Entry(settings_frame, textvariable=self.output_dir).grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
+        ttk.Button(settings_frame, text="Browse", command=self.browse_output_dir).grid(row=0, column=2)
+        
+        # Processing options
+        options_frame = ttk.Frame(settings_frame)
+        options_frame.grid(row=1, column=0, columnspan=3, pady=(10, 0))
+        options_frame.columnconfigure(1, weight=1)
+        options_frame.columnconfigure(3, weight=1)
+        
+        ttk.Label(options_frame, text="Batch Size:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Spinbox(options_frame, from_=1, to=10, textvariable=self.batch_size, width=5).grid(row=0, column=1, sticky=tk.W, padx=(0, 20))
+        
+        ttk.Label(options_frame, text="Max Retries:").grid(row=0, column=2, sticky=tk.W, padx=(0, 5))
+        ttk.Spinbox(options_frame, from_=0, to=5, textvariable=self.max_retries, width=5).grid(row=0, column=3, sticky=tk.W, padx=(0, 20))
+        
+        ttk.Label(options_frame, text="Timeout (ms):").grid(row=1, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        ttk.Spinbox(options_frame, from_=10000, to=120000, increment=5000, textvariable=self.timeout, width=8).grid(row=1, column=1, sticky=tk.W, padx=(0, 20), pady=(5, 0))
+        
+        ttk.Checkbutton(options_frame, text="Verbose Logging", variable=self.verbose).grid(row=1, column=2, sticky=tk.W, pady=(5, 0))
+        
+        # Process control section
+        control_frame = ttk.LabelFrame(main_frame, text="Process Control", padding="10")
+        control_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
+        
+        self.process_button = ttk.Button(control_frame, text="🚀 Start Processing", 
+                                       command=self.toggle_processing)
+        self.process_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        self.progress = ttk.Progressbar(control_frame, mode='indeterminate')
+        self.progress.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+        
+        self.status_label = ttk.Label(control_frame, text="Ready")
+        self.status_label.pack(side=tk.RIGHT)
+        
+        # Output section
+        output_frame = ttk.LabelFrame(main_frame, text="Output Log", padding="10")
+        output_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        output_frame.columnconfigure(0, weight=1)
+        output_frame.rowconfigure(0, weight=1)
+        main_frame.rowconfigure(4, weight=1)
+        
+        self.output_text = scrolledtext.ScrolledText(output_frame, height=15, wrap=tk.WORD)
+        self.output_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Help section
+        help_frame = ttk.Frame(main_frame)
+        help_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E))
+        
+        ttk.Button(help_frame, text="📖 Help", command=self.show_help).pack(side=tk.LEFT)
+        ttk.Button(help_frame, text="📁 Open Project Folder", command=self.open_project_folder).pack(side=tk.LEFT, padx=(10, 0))
+        
+    def check_dependencies(self):
+        """Check if required dependencies are available"""
+        try:
+            # Check if url_screenshot_processor.py exists
+            script_path = Path(__file__).parent / "url_screenshot_processor.py"
+            if not script_path.exists():
+                self.log_output("⚠️ Warning: url_screenshot_processor.py not found in current directory")
+                self.log_output("Please ensure the script is in the same folder as this GUI")
+            else:
+                self.log_output("✅ Screenshot processor script found")
+                
+            # Check Python environment
+            self.log_output(f"🐍 Python version: {sys.version.split()[0]}")
+            self.log_output("📁 Current directory: " + os.getcwd())
+            
+        except Exception as e:
+            self.log_output(f"❌ Error checking dependencies: {e}")
+    
+    def browse_file(self):
+        """Open file browser to select input file"""
+        filetypes = [
+            ("All supported", "*.csv;*.xlsx;*.xls"),
+            ("CSV files", "*.csv"),
+            ("Excel files", "*.xlsx;*.xls"),
+            ("All files", "*.*")
+        ]
+        
+        filename = filedialog.askopenfilename(
+            title="Select URL file",
+            filetypes=filetypes
+        )
+        
+        if filename:
+            self.input_file.set(filename)
+            self.log_output(f"📄 Selected file: {filename}")
+    
+    def browse_output_dir(self):
+        """Open directory browser to select output directory"""
+        directory = filedialog.askdirectory(title="Select output directory")
+        if directory:
+            self.output_dir.set(directory)
+            self.log_output(f"📁 Output directory: {directory}")
+    
+    def create_sample(self):
+        """Create a sample file using the command-line tool"""
+        if self.processing:
+            messagebox.showwarning("Processing", "Please wait for current operation to complete")
+            return
+        
+        self.log_output("📝 Creating sample file...")
+        self.run_command(["python", "url_screenshot_processor.py", "--create-sample"])
+    
+    def open_results(self):
+        """Open the results/screenshots directory"""
+        output_path = Path(self.output_dir.get())
+        if output_path.exists():
+            if sys.platform == "darwin":  # macOS
+                subprocess.run(["open", str(output_path)])
+            elif sys.platform == "win32":  # Windows
+                subprocess.run(["explorer", str(output_path)])
+            else:  # Linux
+                subprocess.run(["xdg-open", str(output_path)])
+        else:
+            messagebox.showinfo("Not Found", f"Directory '{output_path}' does not exist yet")
+    
+    def open_project_folder(self):
+        """Open the current project folder"""
+        project_path = Path(__file__).parent
+        if sys.platform == "darwin":  # macOS
+            subprocess.run(["open", str(project_path)])
+        elif sys.platform == "win32":  # Windows
+            subprocess.run(["explorer", str(project_path)])
+        else:  # Linux
+            subprocess.run(["xdg-open", str(project_path)])
+    
+    def toggle_processing(self):
+        """Start or stop processing"""
+        if not self.processing:
+            self.start_processing()
+        else:
+            self.stop_processing()
+    
+    def start_processing(self):
+        """Start the screenshot processing"""
+        if not self.input_file.get():
+            messagebox.showerror("Error", "Please select an input file first")
+            return
+        
+        if not Path(self.input_file.get()).exists():
+            messagebox.showerror("Error", "Selected file does not exist")
+            return
+        
+        # Build command
+        cmd = ["python", "url_screenshot_processor.py", self.input_file.get()]
+        
+        # Add optional arguments
+        if self.output_dir.get() != "screenshots":
+            cmd.extend(["--output-dir", self.output_dir.get()])
+        
+        if self.batch_size.get() != 3:
+            cmd.extend(["--batch-size", str(self.batch_size.get())])
+        
+        if self.max_retries.get() != 2:
+            cmd.extend(["--max-retries", str(self.max_retries.get())])
+        
+        if self.timeout.get() != 30000:
+            cmd.extend(["--timeout", str(self.timeout.get())])
+        
+        if self.verbose.get():
+            cmd.append("--verbose")
+        
+        self.log_output(f"🚀 Starting processing with command: {' '.join(cmd)}")
+        self.run_command(cmd)
+    
+    def stop_processing(self):
+        """Stop the current processing"""
+        if self.process:
+            self.process.terminate()
+            self.log_output("🛑 Processing stopped by user")
+        self.processing_finished()
+    
+    def run_command(self, cmd):
+        """Run a command in a separate thread"""
+        self.processing = True
+        self.process_button.config(text="🛑 Stop Processing")
+        self.progress.start()
+        self.status_label.config(text="Processing...")
+        
+        # Start command in separate thread
+        thread = threading.Thread(target=self._run_command_thread, args=(cmd,))
+        thread.daemon = True
+        thread.start()
+        
+        # Start monitoring thread
+        self.root.after(100, self.check_output_queue)
+    
+    def _run_command_thread(self, cmd):
+        """Run command in thread and capture output"""
+        try:
+            self.process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True
+            )
+            
+            # Read output line by line
+            for line in iter(self.process.stdout.readline, ''):
+                if line:
+                    self.output_queue.put(('output', line.strip()))
+            
+            # Wait for process to complete
+            return_code = self.process.wait()
+            
+            if return_code == 0:
+                self.output_queue.put(('success', f"✅ Processing completed successfully!"))
+            else:
+                self.output_queue.put(('error', f"❌ Processing failed with exit code {return_code}"))
+                
+        except Exception as e:
+            self.output_queue.put(('error', f"❌ Error running command: {e}"))
+        finally:
+            self.output_queue.put(('finished', None))
+    
+    def check_output_queue(self):
+        """Check for output from the processing thread"""
+        try:
+            while True:
+                msg_type, msg = self.output_queue.get_nowait()
+                
+                if msg_type == 'output':
+                    self.log_output(msg)
+                elif msg_type == 'success':
+                    self.log_output(msg)
+                    messagebox.showinfo("Success", "Processing completed successfully!")
+                elif msg_type == 'error':
+                    self.log_output(msg)
+                    messagebox.showerror("Error", msg)
+                elif msg_type == 'finished':
+                    self.processing_finished()
+                    return
+                    
+        except queue.Empty:
+            pass
+        
+        # Continue checking
+        if self.processing:
+            self.root.after(100, self.check_output_queue)
+    
+    def processing_finished(self):
+        """Clean up after processing is finished"""
+        self.processing = False
+        self.process = None
+        self.process_button.config(text="🚀 Start Processing")
+        self.progress.stop()
+        self.status_label.config(text="Ready")
+    
+    def log_output(self, message):
+        """Add message to output log"""
+        timestamp = time.strftime("%H:%M:%S")
+        formatted_message = f"[{timestamp}] {message}\n"
+        
+        self.output_text.insert(tk.END, formatted_message)
+        self.output_text.see(tk.END)
+        self.root.update_idletasks()
+    
+    def show_help(self):
+        """Show help dialog"""
+        help_text = """
+📸 URL Screenshot Processor - Quick Help
+
+🚀 Getting Started:
+1. Click "Create Sample File" to generate test data
+2. Or click "Browse" to select your own CSV/Excel file
+3. Adjust settings if needed (defaults work well)
+4. Click "Start Processing" to begin
+
+📁 File Format:
+Your file should have URLs in the first column:
+• CSV: URL in first column with "URL" header
+• Excel: URLs in column A
+
+⚙️ Settings:
+• Batch Size: How many URLs to process at once (1-10)
+• Max Retries: Retry attempts for failed URLs (0-5)  
+• Timeout: How long to wait per page (10-120 seconds)
+• Verbose: Show detailed processing information
+
+📊 Output:
+• Screenshots saved to chosen directory
+• Processed file with results and logo URLs
+• Log shows real-time progress and any errors
+
+💡 Tips:
+• Start with sample data to test setup
+• Use batch size 1-3 for slow networks
+• Check "Verbose" if you encounter issues
+• Results folder opens automatically when done
+
+❓ Having Issues?
+• Ensure Python virtual environment is activated
+• Check that Playwright browsers are installed
+• Try smaller batch sizes for stability
+• Review the output log for specific errors
+        """
+        
+        help_window = tk.Toplevel(self.root)
+        help_window.title("📖 Help - URL Screenshot Processor")
+        help_window.geometry("600x500")
+        help_window.resizable(True, True)
+        
+        help_frame = ttk.Frame(help_window, padding="20")
+        help_frame.pack(fill=tk.BOTH, expand=True)
+        
+        help_display = scrolledtext.ScrolledText(help_frame, wrap=tk.WORD, font=('Courier', 10))
+        help_display.pack(fill=tk.BOTH, expand=True)
+        help_display.insert(tk.END, help_text)
+        help_display.config(state=tk.DISABLED)
+        
+        ttk.Button(help_frame, text="Close", command=help_window.destroy).pack(pady=(10, 0))
+
+def main():
+    """Main function to run the GUI"""
+    root = tk.Tk()
+    app = ScreenshotProcessorGUI(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()

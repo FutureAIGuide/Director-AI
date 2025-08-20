@@ -1,0 +1,2 @@
+URL,Original_URL,Normalized_URL,Logo_URL,Screenshot_Path,Status,Error_Message,Processing_Attempts
+https://httpbin.org/html,https://httpbin.org/html,https://httpbin.org/html,,,error,No browser available. Please run 'playwright install' to install browsers.,1
